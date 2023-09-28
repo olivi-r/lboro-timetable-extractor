@@ -1,12 +1,16 @@
 from datetime import datetime, timedelta
 import re
+import sys
 import uuid
 
 try:
     from icalendar import Calendar, Event, vText
 
     from selenium import webdriver
-    from selenium.common.exceptions import NoSuchElementException, TimeoutException
+    from selenium.common.exceptions import (
+        NoSuchElementException,
+        TimeoutException,
+    )
     from selenium.webdriver.chrome.service import Service
     from selenium.webdriver.common.by import By
     from selenium.webdriver.common.keys import Keys
@@ -17,14 +21,21 @@ try:
     from webdriver_manager.chrome import ChromeDriverManager
 
 except ImportError:
-    print("You need to install requirements, run:")
-    print("python -m pip install icalendar selenium webdriver-manager")
+    print(
+        "Missing requirements, run:",
+        "python -m pip install -r requirements.txt",
+    )
     exit(1)
 
 
-# fill in your account details here
-USERNAME = ""
-PASSWORD = ""
+# get login details from command line args
+try:
+    assert len(sys.argv) == 3
+    user, pswd = sys.argv[1:]
+
+except AssertionError:
+    print("Usage: python download.py <learn username> <learn password>")
+    exit(1)
 
 
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
@@ -33,15 +44,15 @@ driver.get("https://lucas.lboro.ac.uk/its_apx/f?p=student_timetable")
 
 username_field = driver.find_element(By.ID, "username")
 username_field.clear()
-username_field.send_keys(USERNAME)
+username_field.send_keys(user)
 
 password_field = driver.find_element(By.ID, "password")
 password_field.clear()
-password_field.send_keys(PASSWORD)
+password_field.send_keys(pswd)
 
 username_field.send_keys(Keys.ENTER)
 
-# trust-browser-button
+# wait for duo login attempt to be accepted
 while True:
     try:
         submit = driver.find_element(By.ID, "trust-browser-button")
@@ -51,17 +62,19 @@ while True:
     except NoSuchElementException:
         continue
 
+# dropdown box with timetable selection
 select_field = WebDriverWait(driver, 5).until(
     expected_conditions.presence_of_element_located((By.ID, "P2_MY_PERIOD"))
 )
 selection = Select(select_field)
+
+# find timetables corresponding to weeks in semester
 opts = list(
     filter(
         lambda x: x.startswith("Sem "),
         [i.text for i in select_field.find_elements(By.TAG_NAME, "option")],
     )
 )
-
 
 urls = dict(zip(opts, [[] for _ in opts]))
 
@@ -74,6 +87,7 @@ for opt in opts:
     selection.select_by_index([i.text for i in selection.options].index(opt))
     driver.refresh()
 
+    # wait until timetable dynamic content loaded
     try:
         WebDriverWait(driver, 2).until(
             expected_conditions.presence_of_element_located(
@@ -82,13 +96,14 @@ for opt in opts:
         )
 
     except TimeoutException:
-        # probably empty table or just didnt load ¯\_(ツ)_/¯
+        # probably empty timetable or just didnt load ¯\_(ツ)_/¯
         continue
 
+    # get timetable element
     timetable = driver.find_element(By.ID, "timetable_details")
 
     for entry in timetable.find_elements(By.CLASS_NAME, "tt_cell"):
-        # open and read details card to get urls
+        # open and read event details card to get urls
         entry.click()
         urls[opt].append(
             WebDriverWait(driver, 5)
@@ -103,7 +118,7 @@ for opt in opts:
             .get_attribute("data")
         )
 
-        # close card
+        # close event card otherwise cant click elements hidden by it
         WebDriverWait(driver, 5).until(
             expected_conditions.presence_of_element_located(
                 (
@@ -113,40 +128,26 @@ for opt in opts:
             )
         ).click()
 
+# initialize .ics
 cal = Calendar()
 cal.add("version", "2.0")
 cal.add("prodid", "-//Lboro Timetable//User Timetable//")
 
-months = [
-    "JAN",
-    "FEB",
-    "MAR",
-    "APR",
-    "MAY",
-    "JUN",
-    "JUL",
-    "AUG",
-    "SEP",
-    "OCT",
-    "NOV",
-    "DEC",
-]
-
-months = dict(zip(months, [str(i).zfill(2) for i in range(1, 13)]))
-
-days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-
 
 for week, events in urls.items():
     for idx, event in enumerate(events):
+        # iteratively load every event from the timetable
         driver.get(event)
 
         try:
             event_details = driver.find_element(By.CLASS_NAME, "event_details")
+
+            # get name of session
             details = {
                 "name": event_details.find_element(By.TAG_NAME, "div").text
             }
 
+            # get fields
             keys = [
                 i.text for i in event_details.find_elements(By.TAG_NAME, "dt")
             ]
@@ -155,28 +156,39 @@ for week, events in urls.items():
             ]
             details.update(dict(zip(keys, values)))
 
-            week_date = re.match(
-                r"Sem \d - Wk \d+ \(starting (\d+-\w+-\d+)\)", week
-            ).groups()[0]
+            # get date of first day in week
+            week_date = datetime.strptime(
+                re.match(
+                    r"Sem \d - Wk \d+ \(starting (\d+-\w+-\d+)\)", week
+                ).groups()[0],
+                "%d-%b-%Y",
+            )
 
-            for k, v in months.items():
-                week_date = week_date.replace(k, v)
-
-            week_date = datetime.strptime(week_date, "%d-%m-%Y")
-
+            # this day/time field should always be present
             day, time = details["Day: Time"].split(": ")
             start_time, end_time = [
                 [int(j) for j in i.split(":")] for i in time.split(" - ")
             ]
 
+            days = [
+                "Monday",
+                "Tuesday",
+                "Wednesday",
+                "Thursday",
+                "Friday",
+                "Saturday",
+                "Sunday",
+            ]
+
+            # get start and end times from time and week day
             start_time = week_date + timedelta(
                 days=days.index(day), hours=start_time[0], minutes=start_time[1]
             )
-
             end_time = week_date + timedelta(
                 days=days.index(day), hours=end_time[0], minutes=end_time[1]
             )
 
+            # create event
             cal_event = Event()
             cal_event.add("summary", details["name"])
             cal_event.add("description", f"Lecturers: {details['Lecturers']}")
@@ -188,7 +200,8 @@ for week, events in urls.items():
 
             cal.add_component(cal_event)
 
-        except NoSuchElementException:
+        except Exception:
+            # something went wrong, user will have to manually add this event
             print(f"Failed to fetch event {idx+1} of '{week}'")
 
 with open("timetable.ics", "wb+") as fp:
