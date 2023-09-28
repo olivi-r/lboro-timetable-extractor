@@ -25,7 +25,7 @@ except ImportError:
         "Missing requirements, run:",
         "python -m pip install -r requirements.txt",
     )
-    exit(1)
+    sys.exit(1)
 
 
 # get login details from command line args
@@ -35,7 +35,7 @@ try:
 
 except AssertionError:
     print("Usage: python download.py <learn username> <learn password>")
-    exit(1)
+    sys.exit(1)
 
 
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
