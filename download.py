@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 import re
 import sys
-import uuid
 
 try:
     from icalendar import Calendar, Event, vText
@@ -199,7 +198,7 @@ for week, events in urls.items():
             cal_event.add("dtstart", start_time)
             cal_event.add("dtend", end_time)
             cal_event["location"] = vText(details["Rooms"])
-            cal_event["uid"] = str(uuid.uuid4())
+            cal_event["uid"] = int(start_time.timestamp())
 
             cal.add_component(cal_event)
 
