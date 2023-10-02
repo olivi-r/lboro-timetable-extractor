@@ -54,6 +54,9 @@ username_field.send_keys(Keys.ENTER)
 
 # wait for duo login attempt to be accepted
 while True:
+    if driver.current_url.startswith("https://lucas.lboro.ac.uk/"):
+        break
+
     try:
         submit = driver.find_element(By.ID, "trust-browser-button")
         submit.click()
