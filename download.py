@@ -29,11 +29,12 @@ except ImportError:
 
 # get login details from command line args
 try:
-    assert len(sys.argv) == 3
-    user, pswd = sys.argv[1:]
+    assert len(sys.argv) == 4
+    semester, user, pswd = sys.argv[1:]
+    assert semester in ("1", "2")
 
 except AssertionError:
-    print("Usage: python download.py <learn username> <learn password>")
+    print("Usage: python download.py <semester: 1,2> <learn username> <learn password>")
     sys.exit(1)
 
 
@@ -73,7 +74,7 @@ selection = Select(select_field)
 # find timetables corresponding to weeks in semester
 opts = list(
     filter(
-        lambda x: x.startswith("Sem "),
+        lambda x: x.startswith(f"Sem {semester}"),
         [i.text for i in select_field.find_elements(By.TAG_NAME, "option")],
     )
 )
