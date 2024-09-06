@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from pathlib import Path
 import re
 import sys
 
@@ -38,8 +39,8 @@ except AssertionError:
     sys.exit(1)
 
 
-driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
-
+driver_path = Path(ChromeDriverManager().install()).parent / "chromedriver.exe"
+driver = webdriver.Chrome(service=Service(driver_path))
 driver.get("https://lucas.lboro.ac.uk/its_apx/f?p=student_timetable")
 
 username_field = driver.find_element(By.ID, "username")
@@ -93,9 +94,7 @@ for opt in opts:
     # wait until timetable dynamic content loaded
     try:
         WebDriverWait(driver, 2).until(
-            expected_conditions.presence_of_element_located(
-                (By.CLASS_NAME, "tt_cell")
-            )
+            expected_conditions.presence_of_element_located((By.CLASS_NAME, "tt_cell"))
         )
 
     except TimeoutException:
@@ -146,24 +145,18 @@ for week, events in urls.items():
             event_details = driver.find_element(By.CLASS_NAME, "event_details")
 
             # get name of session
-            details = {
-                "name": event_details.find_element(By.TAG_NAME, "div").text
-            }
+            details = {"name": event_details.find_element(By.TAG_NAME, "div").text}
 
             # get fields
-            keys = [
-                i.text for i in event_details.find_elements(By.TAG_NAME, "dt")
-            ]
-            values = [
-                i.text for i in event_details.find_elements(By.TAG_NAME, "dd")
-            ]
+            keys = [i.text for i in event_details.find_elements(By.TAG_NAME, "dt")]
+            values = [i.text for i in event_details.find_elements(By.TAG_NAME, "dd")]
             details.update(dict(zip(keys, values)))
 
             # get date of first day in week
             week_date = datetime.strptime(
-                re.match(
-                    r"Sem \d - Wk \d+ \(starting (\d+-\w+-\d+)\)", week
-                ).groups()[0],
+                re.match(r"Sem \d - Wk \d+ \(starting (\d+-\w+-\d+)\)", week).groups()[
+                    0
+                ],
                 "%d-%b-%Y",
             )
 
