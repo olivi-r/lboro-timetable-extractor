@@ -4,7 +4,7 @@ Download student timetable from loughborough uni learn website.
 
 ```sh
 python -m pip install -r requirements.txt
-python download.py <LEARN Username> <LEARN Password> [<Start Date> <End Date>]
+python download.py [<Start Date> <End Date>]
 ```
 
 This writes `timetable.ics` as output.
