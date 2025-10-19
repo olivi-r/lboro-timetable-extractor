@@ -52,7 +52,7 @@ with requests.Session() as session:
 
         dtstart = datetime.datetime.fromisoformat(event["start"])
         cal_event.add("dtstart", dtstart)
-        cal_event.add("uid", int(dtstart.timestamp()))
+        cal_event.add("uid", event["eventRef"])
 
         if "teacherName" in event:
             cal_event.add("description", event["teacherName"])
