@@ -1,32 +1,37 @@
 import datetime
+import getpass
 import icalendar
 import requests
 import re
 import sys
 
+assert len(sys.argv) in [1, 3], "Usage: [<Start Date> <End Date>]"
 
-assert len(sys.argv) in [3, 5], "Usage: <Username> <Password> [<Start Date> <End Date>]"
-
-if len(sys.argv) == 5:
+if len(sys.argv) == 3:
     regex = re.compile(r"\d{4}-\d{2}-\d{2}")
-    assert regex.match(sys.argv[3]), "Start Date must be in YYYY-MM-DD format"
-    assert regex.match(sys.argv[4]), "End Date must be in YYYY-MM-DD format"
-    start = sys.argv[3] + "T00:00:00.000Z"
-    end = sys.argv[4] + "T23:59:59.000Z"
+    assert regex.match(sys.argv[1]), "Start Date must be in YYYY-MM-DD format"
+    assert regex.match(sys.argv[2]), "End Date must be in YYYY-MM-DD format"
+    start = sys.argv[1] + "T00:00:00.000Z"
+    end = sys.argv[2] + "T23:59:59.000Z"
 
 else:
-    today = datetime.date.today()
-    start = today.strftime("%Y-%m-%dT00:00:00.000Z")
-    end = datetime.date(today.year, 12, 31).strftime("%Y-%m-%dT23:59:59.999Z")
+    start = datetime.datetime.combine(
+        datetime.datetime.today(), datetime.time()
+    ).astimezone().isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    end = datetime.datetime.combine(
+        datetime.date(datetime.datetime.today().year + 1, 12, 31), datetime.time(23, 59, 59, 999999)
+    ).astimezone().isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+username = input("Username: ")
+password = getpass.getpass()
 
 with requests.Session() as session:
     resp = session.post(
         "https://my.lboro.ac.uk/campusm/sso/ldap/2548",
-        data={"username": sys.argv[1], "password": sys.argv[2]},
+        data={"username": username, "password": password},
     )
     assert resp.ok, "Login failed"
 
-    today = datetime.date.today()
     resp = session.get(
         "https://my.lboro.ac.uk/campusm/sso/cal2/course_timetable",
         params={"start": start, "end": end},
