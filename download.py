@@ -48,10 +48,14 @@ with requests.Session() as session:
 
         cal_event.add("summary", event["desc1"])
         cal_event.add("dtstamp", datetime.datetime.now())
-        cal_event.add("dtend", datetime.datetime.fromisoformat(event["end"]))
+        
+        # Convert to UTC to ensure compatibility with Google Calendar/Outlook (comliance with RFC 5545)
+        dtend = datetime.datetime.fromisoformat(event["end"]).astimezone(datetime.timezone.utc)
+        cal_event.add("dtend", dtend)
 
-        dtstart = datetime.datetime.fromisoformat(event["start"])
+        dtstart = datetime.datetime.fromisoformat(event["start"]).astimezone(datetime.timezone.utc)
         cal_event.add("dtstart", dtstart)
+        
         cal_event.add("uid", event["eventRef"])
 
         if "teacherName" in event:
